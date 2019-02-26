@@ -1,0 +1,140 @@
+* Bifrost - Distributed OS
+
+** Idée de base, et interet du projet
+
+   Un os se base sur les ressources matérielles afin de fournir une
+   abstraction comprehensible et utilisable pour un programeur.
+   Son but est également de proposer un environement permettant l'exécution
+   de plusieurs processus simultanément et de manière cloisonnée.
+   
+   Si il est possible de mettre en commun de ressources disposés sur
+   une même localité, il devrait être possible de le faire sur une
+   machine distribué géographiquement. 
+
+   La question qui va se poser va donc être : 
+   - Qu'est ce qui différencie un OS local, d'un OS distribué ?
+
+
+*** TODO Listing des questions qui peuvent se poser 
+    DEADLINE: <2019-03-03 dim.>
+    
+    - Que veux dire une OS distribué géographiquement ? 
+      
+      Un premier élément de réponse est de dire que c'est juste un
+      ensemble de machines reliées par des cables. Possiblement hétérogène.
+	  
+	  Un OS qui s'exécute sur une seule machine permettant d'exécuter des processus
+	  et d'accéder à des ressources (fichiers...), alors l'équivalent "distribué"
+	  implique l'utilisation de plusieurs machines pour effectuer ces mêmes tâches.
+	  Le but étant de profiter de ce réseau et des particularités de chaque machine
+	  pour améliorer les performances par exemple.
+     
+    - Quel protocole doit on utiliser pour faire communiquer les différentes machines ?
+      
+      TCP/IP ? J'imagine qu'on peux supposer dans un premier temps que
+      les machines sont géographiquement proches, Donc il n'est peut
+      être pas utile d'utiliser un système aussi complexe.
+	  
+	  Il serait sans doute important de prévoir une abstraction concernant le transfert
+	  de données entre machines afin de pouvoir faire évoluer cette fonctionnalité.
+	  (but : que cette interface permette d'utiliser, à terme, différent protocoles de communication
+	  sans avoir à tout recoder).
+	  
+	  Une sous question serait de déterminer si on se base sur un protocole existant (ça éviterait d'avoir
+	  nécessairement à tout coder soit-même...) ou non. Et si oui, étudier les protocoles 
+	  existant pour déterminer sur lequel baser une première version de l'OS.
+	  
+	- Comment identifier une ressource, un processus, un thread ou autre sur le réseau ?
+	
+	  Dans le cas des fichiers, on doit pouvoir rester sur quelque chose de simple : le chemin, celui-ci
+	  pourrait être imaginé de tel sorte de le simplifier au maximum tout en mettant en évidence explicitement (ou pas)
+	  la position de la machine possédant le fichier, ainsi que sa position dans la machine.
+
+    - Que se passe t'il si une machine tombe en panne, ou ne donne pas les informations demandé par une autres ?
+      
+      C'est là qu'il est important d'avoir de la redondance
+      d'informations, même sur les pages mémoire.  Si des pages sont
+      swappé dans la RAM d'une autre machine que celle qui demande les
+      pages, on a besoin d'être sur que les pages vont arrivé à
+      déstination et rapidement.
+
+      La RAM ne peut pas vraiment être vu de manière locale, si un
+      processus s'execute sur plusieurs machines en même temps (et
+      c'est l'interet d'avoir un OS distribué, sinon, on se contente
+      de virtualiser les ressources, lancer des VM, et les problèmes
+      est reglé), alors il va avoir besoin d'accéder à des pages
+      mémoire qui n'appartiennent pas toujours à la machine qui
+      execute un thread.
+    
+      Exemple : 
+      Un processus de 2 threads, 2 machines de 1 coeurs : 
+      
+      #+NAME: Thread 1
+      #+BEGIN_SRC C++
+      int * a;
+
+      void foo () {
+           a = new int (10);
+      }
+      #+END_SRC
+
+      #+NAME: Thread 2
+      #+BEGIN_SRC C++
+      void bar () {
+          *a = 89; // a est alloué par thread 1, qui s'execute sur la machine A, on est sur la machine B
+      }
+      #+END_SRC
+      
+	- Pour reprendre l'exemple précédent, étudier le cas de deux threads d'un même processus sur deux machines différentes :
+	
+	  En particulier le cas de l'accès à la mémoire partagée, et de l'utilisation des mutex. L'avantage dans un cas classique, avec une machine,
+	  c'est que l'accès n'est pas couteux : pas d'IPC pour comme la communication entre processus... les deux threads partagent le même
+	  contexte d'adressage. Dans le cas "distribué", est-ce qu'on ne risque pas de bousiller les performances ?
+	  
+	  Si oui : ne faudrait-il pas envisager l'idée d'obliger le programmeur à indiquer explicitement qu'il partage des données entre threads ?
+	  Dans ce cas, le système ferait en sorte que les deux threads se trouvent bien sur la même machine.
+	  
+    - Quelle est l'interet ? Pourquoi ne pas se placer à un niveau supérieur (niveau applicatif) ?
+
+      J'imagine que cette question on ne pourra pleinement y répondre que lorsqu'on aura un OS utilisable.
+      Pour le moment cette piste n'a pas vraiment été exploré, et je pense que c'est principalement pour 2 raisons : 
+      - La faisabilité n'a pas été montré, on sait qu'un reseau ça ne fonctionne pas, il y a des fautes, il faut mettre en place des solutions pour contrer les pannes, ou les interruption
+      - Efficacité, si une interruption a lieu, ou que les solutions rajouté pour contrer les pannes coutent cher, on peut avoir une solutions qui utilise les ressources de manière inefficace. 
+		
+    - Vise-t-on un "client" particulier ?
+	
+      Si c'est un utilisateur lambda, on va éviter de représenter sa machine comme un noeud comme un autre du réseau. On aurait alors peut-être un OS client et un OS serveur.
+	  Si c'est un réseau de machines ayant un but précis (calculs, serveurs multimédia...), on peut voir les choses différemment.
+	  
+	- Concernant la partie système de fichier :
+	
+	  Se base-t-on sur quelque chose d'existant style NFS ?
+	  
+	- Question système : répartition des tâches entre noyau et userland (plutôt microkernel ? monolithique ?...)
+	
+	  Ne pas oublier qu'on cherche justement à tester l'efficacité d'un OS distribué, si tout est en userland autant utiliser ce qui existe déjà.
+	  Mais ce serait bien d'avoir quelque chose d'assez fiable, résistant aux pannes, surtout les erreurs noyau. Pour ça, limiter tant que possible
+	  le code présent dans le noyau. On peut ensuite imaginer que les processus systèmes aient des accès privilégiers, par exemple un accès
+	  direct avec le hardware, et avoir des drivers en userland. Ainsi, si un driver crash, on évite le BSOD, et on relance simplement le driver.
+	  S'inspirer du "Reincarnation server" de Minix, qui fait en sorte de réanimer les services/drivers en cas de crash.
+	  
+	- Question système/mémoire : on est d'accord que pour l'OS, on reste sur les capacités classiques en terme de mémoire virtuelle ?
+	  
+	  Petit exemple avec LtKernel : la mémoire virtuelle est organisée de la manière suivante : 1Go pour le noyau et 3Go pour le userland.
+	  Donc un total de 4Go de mémoire virtuelle adressable par noyau et processus. On reste sur quelque chose de similaire ou, ici aussi, on a quelque chose à exploiter ?
+	  
+	  Je pense que non, on ne doit pas oublier qu'on est limité par les capacités du CPU (taille d'une adresse, fonctionnement de la pagination).
+
+*** TODO Définir les différentes étape nécéssaire à la concéption d'un OS    
+    3 étapes : 
+    
+**** TODO 1 . La Guillaume, je vais te laisser faire, ça serait définir ce que fais concrétement un OS, (découpage mirco-kernel, kernel, applicatif ...) 
+     SCHEDULED: <2019-03-09 sam.>
+    
+**** TODO 2 . Ensuite on pourra utiliser ça pour définir comment dans un monde idéal on ferait un OS distribuée (sans prendre en compte le concept de pannes)
+     SCHEDULED: <2019-03-09 sam.>
+     
+**** TODO 3 . Essayer de résoudre les problème posé dans la partie Listing
+     SCHEDULED: <2019-03-23 sam.>
+
+      
