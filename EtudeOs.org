@@ -1,0 +1,110 @@
+* Bifrost - Etude du fonctionnement d'un système d'exploitation
+
+Ce document a pour but de décrire simplement le fonctionnement d'un système d'exploitation simple, puis
+d'imaginer une manière de concevoir un OS distribué à partir de ces informations.
+
+Note : je pars du principe qu'on va travailler sur un OS avec certain certaines caractéristiques ordinaires,
+par exemple certains OS laissent le userland gérer beaucoup plus de choses quant à la gestion de processus...
+Ici, on reste sur un schéma classique : le noyau s'occupe des processus, threads et leur ordonnancement.
+
+** Introduction
+
+On peut distinguer deux grandes parties :
+ - Le noyau
+ - Le userland (parce que "monde utilisateur" c'est moche et plus long)
+
+Le userland est composé de processus, cloisonnés, c'est à dire que grâce à l'utilisation de la mémoire virtuelle,
+ils pensent être seuls sur la machine, et avoir accès à toute la mémoire. Un processus ne peut cependant pas
+en écraser un autre, à moins de le faire volontairement via un appel système. Un processus peut également être soumis
+à des règles de sécurité.
+ 
+Le noyau peut avoir plusieurs rôles suivant ce qu'on lui demande de faire ou non. Certains ont pour but
+de prendre en charge un grand nombre de fonctionnalités, d'autres tout à fait le contraire.
+
+Les deux types de noyaux principaux sont les noyaux monolithiques et les micronoyaux.
+
+*** Micronoyau
+
+Un micronoyau va être petit, et se contenter de mettre à disposition que peu de fonctionnalités : gestion de la mémoire,
+des threads et de leur ordonancement, des IPC (communications interprocessus).
+
+Le reste des fonctionnalités (drivers, systèmes de fichiers, ...) s'exécutent dans le userland.
+
+L'intérêt est d'avoir peu de code, donc moins de bugs, et de profiter du cloisonnement qu'offre l'utilisation de
+processus pour avoir un système plus stable (exemple : si un driver crash, plutôt que de faire crasher le système,
+on le relance simplement).
+L'avantage est également dans la sécurité, il est plus facile de contrôler les accès des processus, le noyau, lui 
+peut tout faire.
+
+L'inconvéniant est sans doute dans les performances, que ce soit concernant l'accès au hardware
+ou tout ce qui concerne la sécurité (plus de vérifications nécessaire). Il faut alors trouver un moyen de 
+limiter le nombre d'appels systèmes, je n'ai pas encore étudié ces problématiques.
+
+Note : je pense qu'il est possible de permettre à un programme s'exécutant dans le userland d'accéder directement au
+hardware.
+
+Exemple de OS : Minix
+
+*** Noyau monolithique
+
+Au contraire, un noyau monolitique va regrouper de nombreuses fonctionnalités. Par exemple, le noyau Linux intègre directement
+le support d'un système de fichier.
+
+L'avantage est, là aussi, sans doute dans les performances. Le noyau peut accéder rapidement au hardware, et sans avoir
+besoin de faire des vérifications de sécurité (par définition, le noyau peut tout faire).
+
+L'inconvéniant est dans la stabilité : un bug, déférencement de pointeur ou autre, et le système crash. Le noyau
+étant plus gros, il y a plus de risque de bug. La surface d'attaque est également plus grande et plus compliquée
+à contrôler.
+
+** Feuille de route pour la création d'un noyau simple
+
+On retrouve principalement les éléments suivants lors de la création d'un noyau (certains de ces éléments seront
+détaillés dans les prochaines parties) :
+ - Utilisation d'un bootloader, exemple : GRUB, son rôle va être de charger le noyau, passer en mode protéger, donner la main du noyau...
+ - Initialiser la GDT : Global Descriptor Table
+ - Initialisation de l'IDT : Interrupt Descriptor Table
+ - Programmation du PIC : Programmable Interrupt Controller
+ - Initialisation du gestionnaire de mémoire physique (opération purement dev, on ne touche pas au matériel)
+ - Initialisation de la mémoire virtuelle et activation de la pagination
+ 
+Une fois cette dernière opération effectuée, il reste à initialiser ce qui compose le reste du noyau (drivers,
+memory pool...).
+
+** Création d'un noyau - Programmation du CPU
+
+*** Global Descriptor Table
+
+*** Interrupt Descriptor Table
+
+*** Programmable Interrupt Controller
+
+*** Gestionnaire de mémoire physique
+
+*** Mémoire virtuelle et pagination
+
+** Les processus et threads
+
+Un processus est une notion abstraite qui va représenter un programme qui s'exécute sur une machine.
+Un proecssus est, en pratique, composé d'un ou plusieurs threads. Il a également pour but décrire ce que les threads
+ont en commun : la mémoire.
+
+Le thread est l'entité utilisé par l'OS pour représenter un ensemble :
+ - du code à exécuter
+ - de la mémoire
+ - d'autres éléments qui dépendent de l'architecture de l'OS...
+ 
+Ainsi, le noyau ne va pas exécuter un processus, mais un thread, ce dernier partageant sa mémoire avec les autres
+threads du même processus.
+
+** Ordonnancement
+
+** Appels système
+
+** Communications inter-processus
+
+** Idées concernant les allocations dynamique du noyau
+
+** Debugging
+
+* Bifrost - Imaginons un OS distribué
