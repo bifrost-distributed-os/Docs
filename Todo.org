@@ -132,6 +132,7 @@
      SCHEDULED: <2019-03-09 sam.>
      
     En cours : [[file:EtudeOs.org][Etude OS]]
+	Il me reste à : étudier le fonctionnement des IPC, et les algo d'ordonancement et d'allocation dynamique.
     
 **** TODO 2 . Ensuite on pourra utiliser ça pour définir comment dans un monde idéal on ferait un OS distribuée (sans prendre en compte le concept de pannes)
      SCHEDULED: <2019-03-09 sam.>

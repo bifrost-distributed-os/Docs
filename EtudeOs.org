@@ -3,9 +3,12 @@
 Ce document a pour but de décrire simplement le fonctionnement d'un système d'exploitation simple, puis
 d'imaginer une manière de concevoir un OS distribué à partir de ces informations.
 
-Note : je pars du principe qu'on va travailler sur un OS avec certain certaines caractéristiques ordinaires,
+Note 1 : je pars du principe qu'on va travailler sur un OS avec certain certaines caractéristiques ordinaires,
 par exemple certains OS laissent le userland gérer beaucoup plus de choses quant à la gestion de processus...
 Ici, on reste sur un schéma classique : le noyau s'occupe des processus, threads et leur ordonnancement.
+
+Note 2 : ma principale référence sera le tuto rédigé en Français "pepin os" car il donne une idée claire des principaux
+mécanismes abordés ici.
 
 ** Introduction
 
@@ -73,15 +76,80 @@ memory pool...).
 
 ** Création d'un noyau - Programmation du CPU
 
+La création d'un noyau commence par la programmation du CPU, afin d'activer certains mécanismes mis à disposition
+par le processeur et dont nous avons besoin (par exemple, la pagination).
+
 *** Global Descriptor Table
 
-*** Interrupt Descriptor Table
+GRUB passant le processeur en mode protégé, on passe en adressage "logique", c'est à dire qu'une adresse manipulée par le programmeur
+se compose d'un sélecteur de segment et d'un offset. Ce sélecteur de segment fait référence à une entrée dans un tableau nommé "Global Descriptor Table".
+Celui-ci décrit plusieurs segments, en spécifiant leur type, avec quel niveau de privilège peut-on les utiliser, etc...
+
+Par exemple, avec le noyau LtKernel, on a :
+ - 1 Segment de code et un segment de données/pile pour le noyau, couvrent toute la RAM, accessibles qu'en ring 0
+ - 1 Segment de code et un segment de données/pile pour le userland, couvrent toute la RAM, accessibles en ring <= 3
+ - Un Segment TSS, faisant référence à la structure TSS, utilisée dans le mécanisme de commutation de tâche
+
+Ce tableau est renseigné auprès du processeur via l'instruction ~lgdt~
+
+Plus de détails ici : [[http://a.michelizza.free.fr/pmwiki.php?n=TutoOS.ProtectedMode][Pepin Os - Addresser la mémoire en mode protégé]]
 
 *** Programmable Interrupt Controller
 
+Le controleur d'interruption programmable permet de faire deux choses :
+ - indiquer quelles interruptions masquer ou non : si on masque l'interruption du périphérique clavier, alors le processeur ne sera pas notifié
+ des événements provenant du clavier. On peut donc demander à être notifié, ou pas, de tel ou tel périphérique.
+ - indiquer sur "range" de l'IDT sont stockées les routines à appeler en cas d'interruption matérielles (IDT, voir la partie suivante).
+
+Plus de détails ici : [[http://a.michelizza.free.fr/pmwiki.php?n=TutoOS.Int][Pepin Os - Un chipset pour gérer les interruptions matérielles : le 8259A]]
+ 
+*** Interrupt Descriptor Table
+
+La table d'interruptions, ou Interrupt Descriptor Table, représente un tableau contenant des pointeurs sur fonction. On retrouve 3 types
+de fonction dans cette table :
+ - les exceptions processeur : la routine à appeler en cas de défaut de page, de breakpoint (~int 3~), ...
+ - les interruptions matérielles : horloge CPU, clavier, port série...
+ - les interruptions logicielles : les appels système
+ 
+Note : quand une interruption est déclanchée, le processeur bascule sur une pile noyau, indiquée dans le segment TSS, si la tâche courante
+tourne en utilisateur. Dans tous les cas, le contenu de plusieurs registres sont placés sur la pile noyau afin de pouvoir revenir
+à la tâche interrompu une fois l'interruption traitée.
+
 *** Gestionnaire de mémoire physique
 
+Cela ne concerne pas la programmation du CPU, mais c'est tout de même nécessaire : il faut un outil permettant de savoir quelles pages physique
+sont libres en RAM. Une solution est l'utilisation d'un bitmap.
+
+Note : GRUB nous file un pointeur sur une structure comportant des info dont la taille de la RAM.
+
 *** Mémoire virtuelle et pagination
+
+L'utilisation de la mémoire virtuelle permet une utilisation plus souple de la mémoire et donne plusieurs avantages :
+ - Deux processus ne peuvent pas accéder à la même mémoire physique involontairement
+ - Même avec 2Go de RAM on peut faire croire au processus qu'il en a 4Go
+ - Si une page n'est pas en mémoire, le défaut de page permet de régler le problème...
+ - et on doit pouvoir en trouver d'autres...
+ 
+Son mécanisme est simple : ici aussi le processeur se base sur une table, et même sur plusieurs : un répertoire de table pages,
+et des tables de pages.
+Chaque entrée du répertoire de table pages pointe sur une table de page.
+Chaque entrée d'une table de page pointe sur une page.
+
+Une adresse va se résoudre de cette manière : 
+ - les 10 premiers bits représentent un offset dans le répertoire de pages.
+ - les 10 suivants représentent un offset dans la table récupérée.
+ - les 12 derniers représentent un offset sur la page (donc l'adresse physique récupérée + cet offset = destination physique)
+ 
+Note 1 : on peut être amené à modifier une entrée de répertoire ou de table, mais on a aucune adresse virtuelle pour y accéder...
+Du coup, à la mise en place de la pagination, on place l'adresse physique du début du répertoire dans la dernière entrée du répertoire.
+Et on fait de même avec les tables. De cette manière, en créant l'adresse virtuelle adéquate, on peut tomber sur l'entrée qui nous intéresse.
+
+Note 2 : afin que chaque processus ait son propre espace d'adressage, on change de répertoire de pages à chaque commutation de tâche.
+
+Note 3 : afin que le code noyau fonctionne correctement, le 1er Go, réservé au noyau, utilise l'"identity mapping", c'est à dire que 
+l'adresse virtuelle 0 == l'adresse physique 0, etc... sur 1Go de mémoire.
+
+Plus de détails ici : [[http://a.michelizza.free.fr/pmwiki.php?n=TutoOS.Mm][Pepin Os - Mémoire virtuelle et mémoire physique]]
 
 ** Les processus et threads
 
@@ -97,14 +165,57 @@ Le thread est l'entité utilisé par l'OS pour représenter un ensemble :
 Ainsi, le noyau ne va pas exécuter un processus, mais un thread, ce dernier partageant sa mémoire avec les autres
 threads du même processus.
 
+Lors d'une commutation de tâche, le noyau va enregistrer dans une structure l'état du thread (tous ses registres, l'adresse du répertoire
+de pages au cas où on changerait de processus...).
+
 ** Ordonnancement
+
+Je n'ai pas beaucoup étudier cette partie. Le principe est de déterminer quel thread exécuter, et pendant combien de temps...
 
 ** Appels système
 
+Les appels systèmes permettent à un processus utilisateur de demander au noyau d'effectuer une action qu'il ne peut pas faire lui-même,
+par exemple un accès à du matériel.
+
+Le fonctionnement d'un appel système repose sur le mécanisme des interruptions déjà vu.
+On y rajoute une problématique : le passage de paramètre. Dans le cas de LtKernel, les quelques paramètres,
+tel que le numéro de l'appel système ou la chaîne à afficher, sont passé via les registres.
+Ceux-ci sont push sur la pile dans le code de l'interruption, permettant ensuite au gestionnaire d'appel système 
+de récupérer les paramètres.
+
+Le noyau utilisant le même répertoire de pages que la tâche faisant l'appel système, il a accès aux même données,
+et peut ainsi utiliser librement les pointeurs en provenance du userland.
+
 ** Communications inter-processus
+
+Je n'ai pas encore étudié cette partie. Le principe est de pouvoir effectuer un transfert de données entre deux processus, 
+qui utilisent donc deux contextes d'adressage différents.
 
 ** Idées concernant les allocations dynamique du noyau
 
+Le thème de l'allocation dynamique dans le noyau est important car suivant l'algorithme utilisé, il peut être plus ou moins compliqué,
+plus ou moins rapide, plus ou moins sujet à des problèmes de fragmentation...
+
+Le mieux serait de se passer d'allocation dynamique, ou du moins avoir quelque chose de très très simple. On évite des bugs côté noyau.
+C'est l'avantage d'utiliser un micronoyau, moins de besoin, on peut peut-être se contenter de bloc de mémoire qui seront réservés à un même utilité.
+
+On doit pouvoir parler des memory pool, de l'algo "classique" d'alloc dynamique comme dans Ltkernel, ou encore de Buddy/Slab allocator.
+
 ** Debugging
+
+Avoir la possibilité de debugger le noyau facilement, c'est cool.
+Il semble qu'il soit possible de debugger avec GDB ([[http://a.michelizza.free.fr/pmwiki.php?n=TutoOS.Gdb][Déboguer le noyaua vec gdb]]), mais gdb est
+vite limité : affichage du code assembleur, de la mémoire et des registres, breakpoint.
+
+Un debugger maison peut avoir plusieurs avantages : 
+ - possibilité d'y ajouter une interface graphique pour plus de clareté
+ - faire le lien avec le code source
+ - mais surtout, afficher des info systèmes, se placer dans le contexte d'un thread, ...
+ 
+Le fonctionnement d'un debugger est simple : on utilise les interruptions 1 (Debug) et 3 (Breakpoint).
+L'interruption 3 est déclenchée par le développeut via l'instruction assembleur ~int 3~.
+Un bit dans le registre EFLAG permet d'activer le mode "pas à pas", le processeur va alors n'exécuter qu'une instruction et provoquer l'interruption 1.
+
+Concernant le dialogue entre debugger et noyau, le plus simple est l'utilisation du port série, impliquant la réalisation d'un driver très simple.
 
 * Bifrost - Imaginons un OS distribué
