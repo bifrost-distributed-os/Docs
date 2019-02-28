@@ -266,3 +266,36 @@ Un bit dans le registre EFLAG permet d'activer le mode "pas à pas", le processe
 Concernant le dialogue entre debugger et noyau, le plus simple est l'utilisation du port série, impliquant la réalisation d'un driver très simple.
 
 * Bifrost - Imaginons un OS distribué
+
+** Quelques idées en vrac
+
+*** Reprise du code de LtMicros : programmation du CPU
+
+La partie la plus basse du noyau est la même que pour un noyau classique, cela concerne toute la partie programmation du CPU.
+On peut donc imaginer reprendre la base du code de LtMicros, qui est propre et documenté.
+
+*** Implémentation du gestionnaire d'allocation dynamique
+
+On enchaîne ensuite avec la gestion des allocations du noyau. Ce dernier en aura sans doute besoin au début, avant même que les mécanismes
+permettant d'être un OS distribué soient en place (genre le driver réseau aura sans doute besoin d'allouer de la mémoire...).
+
+Mon but était au départ de se débarrasser d'un système "compliqué", et de se contenter de "memory pool". L'avantage de ces derniers, c'est qu'en
+partant du principe qu'on connait à l'avance la taille des quelques rares types de données qu'on va vouloir stocker, on peut créer un allocateur
+très simple, sans risque de fragmentation ou autre... On réserve un morceau de mémoire, et on le découpe en bloques de même taille.
+
+Mais dans notre cas, on ne va pas pouvoir rester sur du micronoyau à proprement parler...
+
+Il faut donc trouver un algorithme fiable permettant de gérer simplement les allocations dynamiques. Plusieurs solutions :
+ - On commence avec quelque chose de simple : celui de LtKernel, on sait qu'il fonctionne mais on a pas testé ses limites
+ - On tente une nouvelle approche plus simple, en partant du principe que le noyau
+ 
+*** Implémentation des processus et threads
+
+Je pense qu'on peut déjà commencer par ces affirmations :
+ - On a un seul processus système, constitué de threads noyau (ou pas ??)
+ - Les threads noyau s'exécutent sur la machine sur laquelle tourne le noyau
+ - Les processus utilisateur est composé de threads
+ - Un thread peut être exécuté sur n'importe quel machine du réseau
+ 
+Un thread noyau doit exécuter une tâche que seul le noyau peut exécuter... Il faut déterminer quels types de tâches pourraient nécessiter 
+l'utilisation de threads noyau. Et si les threads noyau sont nécessaires, ces tâches peuvent-elles s'exécuter sur une autre machine ?
