@@ -168,6 +168,12 @@ threads du même processus.
 Lors d'une commutation de tâche, le noyau va enregistrer dans une structure l'état du thread (tous ses registres, l'adresse du répertoire
 de pages au cas où on changerait de processus...).
 
+Note : on doit pouvoir distinguer deux types de threads
+ - les threads noyau, ils partagent la même mémoire, celle du noyau
+ - les threads utilisateur
+ 
+Note 2 : il semble que certains OS implémentent la gestion/l'ordonnancement des threads dans le userland...
+
 ** Ordonnancement
 
 Je n'ai pas beaucoup étudier cette partie. Le principe est de déterminer quel thread exécuter, et pendant combien de temps...
@@ -188,8 +194,49 @@ et peut ainsi utiliser librement les pointeurs en provenance du userland.
 
 ** Communications inter-processus
 
+*** Généralité
+
 Je n'ai pas encore étudié cette partie. Le principe est de pouvoir effectuer un transfert de données entre deux processus, 
 qui utilisent donc deux contextes d'adressage différents.
+
+A priori, ça va consister en un appel système, qui va allouer de la mémoire dans le context du processus cible, et y copier les données.
+Cela implique, pour le noyau, de copier les données dans un premier temps dans son espace, puis de changer de context d'adressage (celui du processus cible),
+et enfin de mettre à jour ce dernier pour accéder aux données récupérée (on doit pouvoir éviter de faire deux copies physiquement, en jouant simplement
+avec les tables de pages de la tâche utilisateur).
+
+*** LPC/RPC : Local & Remote Procedure Call
+
+Sujet pas énormément étudié non-plus, mais que j'ai beaucoup utilisé sous Windows. Ces deux mécanismes permettent, respectivement, d'exécuter une fonction
+sur un processus d'une machine locale ou distante.
+
+Un processus met à disposition une interface composée d'un ou plusieurs prototypes de fonction. Il possède également l'implémentation de ces fonction. 
+Il se déclare à son démarrage en tant que server LPC/RPC.
+
+Un autre processus, distant ou non, va se connecter à l'interface du serveur RPC/LPC. Il connait les prototypes des fonctions en question, et va demander à exécuter
+une procédure sur ce processus. La gestion des paramètres, qu'ils soient en "in" ou "out", est prise en compte.
+
+Ceci implique que dans le cas du passage d'un tableau d'octets par exemple, le noyau va devoir effectuer une tâche similaire à ce qui a été expliqué
+précédemment (partie Générélité).
+
+** Accès concurrents 
+
+Un système d'exploitation doit mettre à disposition au programmeur un moyen de protéger l'accès aux données qui dont partagées
+entre threads et processus.
+
+Côté noyau, je vois deux moyens quant au fonctionnement des mutex/sections critiques :
+ - On se base sur une variable globale, un thread qui veut accéder à une ressource protégée vérifie de manière atomique cette variable globale et
+ va simplement boucler sur cette vérification jusqu'à ce que la variable soit à 0. L'inconvéniant c'est qu'on prend du temps au CPU pour rien.
+ - Se baser également sur une variable globale, sauf que si celle-ci est occupée, on place le thread en attente. L'ordonnanceur essaye de temps
+ en temps de relancer le thread, qui se met en pause immédiatement si la ressource n'est toujours pas prête.
+ 
+Côté utilisateur, on ne va pas avoir la possibilité de mettre au pause tout seul le thread, donc deux solutions :
+ - Utilisation d'une section critique, on boucle jusqu'à avoir accès à la ressource (je crois que c'est comme ça que sont implémentées les sections critiques
+ sous windows en userland)
+ - Utilisation d'un mutex, impliquant un appel système : dans ce cas c'est le noyau qui va gérer le problème, en mettant le thread en pause
+ 
+C'est l'idée simple, plusieurs algorithmes permettent de régler les problèmes d'accès concurent, mais généralement on en revient au même :
+ - boucler
+ - ou mettre le thread en pause
 
 ** Idées concernant les allocations dynamique du noyau
 
