@@ -1,0 +1,70 @@
+* Bifrost - Rasberry Pi
+
+L'utilisation d'un Rasberry Pi peut être une bonne idée pour simuler facilement un réseau et les
+problèmes qui vont avec.
+
+Cette étude a pour but de détailler la version de Rasberry Pi visée, ses caractéristiques, le matériel
+nécessaire, et l'environnement de dev dont on aura besoin pour développer et tester l'OS.
+
+** Rasberry Pi 3 modèle B+
+
+Au 02/03/19, c'est le dernier produit de la gamme Rasberry Pi 3 avec :
+ - un processeur quad core 64 bits 1.4GHz
+ - un réseau sans fil bibande 2.4GHz et 5GHz
+ - une connexion Bluetooth 4.5/BLE
+ - connexion ethernet
+ - 1Go de RAM
+ - 4 ports USB 2.0
+ - 40 PIN GPIO
+ - sortie HDMI
+ - support carte SD
+ - ...
+ 
+Plus de détails au lien suivant : [[https://www.kubii.fr/raspberry-pi/2119-raspberry-pi-3-modele-b-1-gb-kubii-713179640259.html][Rasberry Pi 3 B+]]
+
+Ce modèle a de nombreux avis positifs, j'ai également trouvé un tuto qui semble assez sérieux et basé sur le modèle B
+
+** Kit Rasberry Pi
+
+La carte toute seule, c'est limite, donc deux solutions :
+ - Acheter un kit comme celui-ci : [[https://www.kubii.fr/kits-raspberry-pi/2121-starter-kit-officiel-pi-3-b-kubii-3272496009998.html][Kt Rasberry Pi 3 B+]]
+ - Acheter le matos séparément
+ 
+Le nécessaire :
+ - Une carte micro SD (ils proposent généralement une carte NOOBS dans les kits..)
+ - Une alimentation 5V 2.5A
+ - Un cable HDMI
+ - (Peut-être un adaptateur série, voir note plus bas)
+ 
+Les plus :
+ - Un petit écran
+ - Et un clavier pour être tranquille
+ 
+Note : sur le tuto suivant, il est également conseillé d'avoir un adaptateur port série. Il est utilisé, avec un programme codé par l'auteur,
+pour facilement transférer son noyau en cours de dev de son PC au RPi sans avoir à passer par la carte SD à chaque fois (ça fatigue le matériel...).
+[[https://wiki.osdev.org/Raspberry_Pi][Tuto 1]]
+
+** Environnement de dev
+
+On va avoir besoin d'un environnement de dev particulier étant donné qu'on vise une architecture ARM.
+
+*** Cross compiler
+
+On doit pouvoir se démerder avec le cross compiler de GCC.
+
+*** Emulateur
+
+Tester directement le noyau sur le RPi c'est casse pieds, alors ce serait bien de pouvoir passer par un émulateur, qemu semble faire l'affaire :
+#+NAME: Qemu command line
+#+BEGIN_SRC sh
+qemu-system-aarch64 -M raspi3 -serial stdio -kernel kernel8.img
+#+END_SRC
+[[https://wiki.osdev.org/Raspberry_Pi_Bare_Bones][Source : Testing your operating system (QEMU)]]
+
+Un au lien trouvé qui semble intéressant pour utiliser Qemu sous Windows pour RPi : [[https://sourceforge.net/projects/rpiqemuwindows/][Raspberry Pi emulation for Windows ]]
+
+*** Ressources
+
+- Quelques bases : [[https://wiki.osdev.org/Raspberry_Pi][OsDev : Rasberry Pi]]
+- Un premier noyau : [[https://wiki.osdev.org/Raspberry_Pi_Bare_Bones][Rasberry Pi Bare Bones]] (note : je crois que l'auteur a testé ça sur la version 2 de RPi...)
+- Un tuto qui semble très propre, version 3 de RPi : [[https://github.com/s-matyukevich/raspberry-pi-os][Rasberry Pi OS - github]]

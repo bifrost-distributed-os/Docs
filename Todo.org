@@ -131,8 +131,10 @@
 **** TODO 1 . La Guillaume, je vais te laisser faire, ça serait définir ce que fais concrétement un OS, (découpage mirco-kernel, kernel, applicatif ...) 
      SCHEDULED: <2019-03-09 sam.>
      
-    En cours : [[file:EtudeOs.org][Etude OS]]
-	Il me reste à : étudier le fonctionnement des IPC, et les algo d'ordonancement et d'allocation dynamique.
+    En cours : 
+	 - [[file:EtudeOs.org][Etude OS]] : Pas mal avancé, sans doute des détails que j'ai oublié...
+	 - [[file:EutideRPi.org][Etude Rasberry Pi]] : J'ai également commencé à étudier la possibilité de supporter l'archi ARM du Rasberry Pi.
+	
     
 **** TODO 2 . Ensuite on pourra utiliser ça pour définir comment dans un monde idéal on ferait un OS distribuée (sans prendre en compte le concept de pannes)
      SCHEDULED: <2019-03-09 sam.>
