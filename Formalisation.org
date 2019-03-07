@@ -1,0 +1,146 @@
+
+#+OPTIONS: tex:imagemagick
+#+LaTeX_HEADER: \usepackage{tikz}
+#+LaTeX_HEADER: \usepackage{pstricks, pst-plot, pstricks-add, relsize, amsmath, xspace}
+#+LaTeX_HEADER: \usepackage{pgfplots}
+#+LaTeX_HEADER: \usetikzlibrary{arrows,positioning, arrows.meta, fit, calc}
+#+LaTeX_HEADER: \usepackage{adjustbox}
+* Formalisation :
+  Ce document a pour objectif de formaliser le concept qu'on va essayer d'appliquer pour la réalisation d'un OS distribué entre plusieurs noeuds de calcul.
+
+** Approche par hyperviseur :
+
+  Ça me semble être la meilleur approche possible : 
+
+*** Hyperviseur définition :
+
+    Il y a deux types d'hyperviseur : 
+    - 1.) hardware, bare metal
+      
+\begin{tikzpicture}         
+[node distance = 2cm, auto,
+every node/.style={node distance=2cm},
+force/.style={rectangle, draw, text width=2cm, text badly centered, minimum height=1.2cm}] 
+
+\node[force] (hardware) {$Hardware$};
+\node[force, below of=hardware] (hyper) {$Hypervisor$};
+\node[force, below of=hyper, left=1cm of hyper] (x0) {$OS$};
+\node[force, right=1cm of x0] (x1) {$OS$};
+\node[force, right=1cm of x1] (x2) {$OS$};
+
+
+\path [-, thick]
+(hardware) edge (hyper)
+(hyper) edge (x0)
+(hyper) edge (x1)
+(hyper) edge (x2);
+
+\end{tikzpicture}
+
+    - 2.) software, hosted
+
+\begin{tikzpicture}         
+[node distance = 2cm, auto,
+every node/.style={node distance=2cm},
+force/.style={rectangle, draw, text width=2cm, text badly centered, minimum height=1.2cm}, 
+weak/.style={rectangle, draw, dotted, text width=2cm, text badly centered, minimum height=1.2cm}] 
+
+\node[force] (hardware) {$Hardware$};
+\node[force, below of=hardware] (os) {$OS$};
+\node[force, below of=os, right=-4.44cm of os] (hyper1) {$Hypervisor$};
+\node[force, right=2cm of hyper1] (hyper2) {$Hypervisor$};
+\node[force, below of=hyper, left=1cm of hyper1] (x0) {$OS$};
+\node[force, right=1cm of x0] (x1) {$OS$};
+\node[force, right=1cm of x1] (x2) {$OS$};
+\node[weak, right=1cm of x2] (x3) {$OS$};
+
+
+\path [-, thick]
+(hardware) edge (os)
+(os) edge (hyper2)
+(os) edge (hyper1)
+(hyper1) edge (x0)
+(hyper1) edge (x1)
+(hyper2) edge (x2);
+
+\path [-, dotted]
+(hyper2) edge (x3);
+
+\end{tikzpicture}      
+
+
+L'idée serait de fournir un troisième type d'hyperviseur, qui pourrait soit être de type (1.) ou de type (2.).
+Un hyperviseur distribué entre plusieurs nodes : 
+
+- 3.) distributed, (hosted or bare metal)
+
+\begin{tikzpicture}         
+[node distance = 2cm, auto,
+every node/.style={node distance=2cm},
+force/.style={rectangle, draw, text width=2cm, text badly centered, minimum height=1.2cm}, 
+label/.style={rectangle, fill=white, minimum size=40pt, inner sep=0pt}, 
+weak/.style={rectangle, draw, dotted, text width=2cm, text badly centered, minimum height=1.2cm}] 
+
+\node[force] (hardware1) {$Hardware$};
+\node[force, below of=hardware1] (hardware2) {$Hardware$};
+\node[force, below of=hardware2] (hardware3) {$Hardware$};
+\node[force, right=1cm of hardware1] (os1) {$OS$};
+\node[force, right=1cm of hardware2] (os2) {$OS$};
+
+\node[force, right=1cm of os1] (hyper1) {$Hypervisor$};
+\node[force, right=1cm of os2] (hyper2) {$Hypervisor$};
+\node[force, below of=hyper2] (hyper3) {$Hypervisor$};
+
+\node[force, right=1cm of hyper2] (x0) {$OS$};
+\node[weak, below of=x0] (x2) {$OS$};
+
+\draw [black, densely dashed] ($(hyper1.north west)+(-0.2, 0.2)$) rectangle ($(hyper3.south east)+(0.2, -0.2)$) node [anchor=center] {};
+\node[label, below of=x2](aggr_1){\large meta-visor or ultra-visor};
+\draw [thick, <-, shorten >= 1pt] ($(hyper3.south east)+(0.3, 0.3)$) to[] node[bottom] {} (aggr_1);
+
+\path [-, thick]
+(hardware1) edge (os1)
+(hardware2) edge (os2)
+(hardware3) edge (hyper3)
+(os1) edge (hyper1)
+(os2) edge (hyper2)
+(hyper1) edge (x0)
+(hyper2) edge (x0)
+(hyper3) edge (x0);
+
+\path [-, dotted]
+(hyper2) edge (x2)
+(hyper3) edge (x2);
+
+\end{tikzpicture}      
+
+
+*** Concept de l'ultraviseur
+    
+    Un hyperviseur est appelé ainsi, parceque le kernel est le superviseur du materiel, et donc l'hyperviseur le superviseur du superviseur
+    Un ultraviseur est le superviseur de plusieurs hyperviseur
+
+    Il existe pas mal de travaux sur la supervision des hyperviseur, dans un contexte Cloud, mais il ne cherche jamais à les faire travailler ensemble pour la gestion d'une même machine virtuelles.
+    Ils se contente de leurs faire réaliser les actions suivantes : 
+    - Démarrage de VM
+    - Pause
+    - Resume
+    - Stop
+    - Migration
+      La migration d'une VM consiste en l'envoi d'une VM d'un noeud vers un autre, il y a plusieurs façon de s'y prendre
+      + Pre-copy, on envoi toutes les pages froide, sans couper la VM sur la machine hote courante, et on met à jour les pages au fur et à mesure jusqu'a ce que toutes les pages soit envoyé  (peut ne pas converger)
+      + Post-copy, on charge les pages utilisé dans la machine cible et, on la relance sur le deuxième noeud et on recharge les pages demandé au fur et à mesure (celle qui sont toujours sur l'ancien noeud sont copié pendant se temps la par ordre de prio)
+      + Direct, on coupe la VM, on copie tout et on resume sur le deuxième noeud
+	
+
+    Comme on peut le voir les technique de migration, font déjà un peu ce que l'on veut faire, mais uniquement pour la mémoire. Les threads eux ne s'execute que sur une seule machine à la fois
+
+
+*** Liste d'hyperviseur 
+
+    La liste suivante (hyper longue ^^) répértorie la liste des hyperviseur existant (à ma connaissance): 
+    - Xen, sous licence GPL, est une hyperviseur de type 2, il est à priori facile à modifier (en tout cas pas mal de monde le fait), et ne necessite aucune modification de l'OS
+      C'est peut être moins drole du coup, si on modifie par l'OS
+    - KVM, incorporé directement à Linux, est une hyperviseur de type 1 et 2, il a accès directement au hardware mais est en compétition avec d'autre utilisateur (thread lancé par d'autre moyen que l'hyperviseur)
+    - VMWare, ultra payant 
+    - FreeBSD, je connais pas bien
